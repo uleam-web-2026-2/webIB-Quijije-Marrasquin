@@ -1,8 +1,8 @@
 # Taller de Montaje - Hilo Cliente
 
 ## 👥 Integrantes
-* **Estudiante 1:** Quijije
-* **Estudiante 2:** Marrasquin
+* **Estudiante 1:** Quijije Quijije Deivis Michael
+* **Estudiante 2:** Marrasquin Anthony
 
 ## 🛠️ Requisitos Previos
 * Node.js LTS instalado (v22+ recomendado).
@@ -17,4 +17,4 @@
    ---
 
 ## ☁️ Integración con Supabase
-* **Project URL:** https://xplvjxbavywmvydwcbhj.supabase.co
+* **Project URL:** https://xplvjxbavywmvydwcbhj.supabase.cosh
