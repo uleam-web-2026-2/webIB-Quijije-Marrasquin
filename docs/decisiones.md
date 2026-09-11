@@ -18,4 +18,4 @@
 ## 4. El pie usa `<footer>` y la marca de tiempo usa `<time>`
 * **Elegido:** `<footer>` con párrafos `<p>` y la marca de tiempo en `<time datetime="2026-09-11T09:40">`.
 * **Descartado:** Un `<div class="footer">` con texto plano.
-* **Consecuencia que evita:** `<footer>` se anuncia como región de pie de página (landmark) accesible por salto directo. El atributo `datetime` de `<time>` estandariza la fecha para lectores de pantalla y máquinas sin depender de formatos locales.
+* **Consecuencia que evita:** `<footer>` se anuncia como región de pie de página (landmark) accesible por salto directo. El atributo `datetime` de `<time>` estandariza la fecha para lectores de pantalla y máquinas sin depender de formatos locales.  
