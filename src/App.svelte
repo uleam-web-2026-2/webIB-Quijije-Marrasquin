@@ -2,6 +2,7 @@
   <header class="topbar">
     <div class="brand-block">
       <p class="brand-name"><strong>Mesa de Ayuda</strong></p>
+      <span class="phase-badge">Fase 3</span>
     </div>
 
     <nav aria-label="Navegación principal" class="main-nav">
