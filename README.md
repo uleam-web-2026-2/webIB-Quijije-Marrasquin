@@ -6,7 +6,7 @@
 
 ## 🛠️ Requisitos Previos
 * Node.js LTS instalado (v22+ recomendado).
-* Git configurado.
+* Git configurado.  
 
 ## 🚀 Instrucciones para Levantar el Proyecto
 1. Clonar este repositorio:
