@@ -18,4 +18,9 @@
 ## 4. El pie usa `<footer>` y la marca de tiempo usa `<time>`
 * **Elegido:** `<footer>` con párrafos `<p>` y la marca de tiempo en `<time datetime="2026-09-11T09:40">`.
 * **Descartado:** Un `<div class="footer">` con texto plano.
-* **Consecuencia que evita:** `<footer>` se anuncia como región de pie de página (landmark) accesible por salto directo. El atributo `datetime` de `<time>` estandariza la fecha para lectores de pantalla y máquinas sin depender de formatos locales.  
+* **Consecuencia que evita:** `<footer>` se anuncia como región de pie de página (landmark) accesible por salto directo. El atributo `datetime` de `<time>` estandariza la fecha para lectores de pantalla y máquinas sin depender de formatos locales.
+
+## 5. Criterio de revisión final
+* **Elegido:** Mantener una estructura de contenido clara, con títulos, formularios y tablas bien etiquetados.
+* **Descartado:** Añadir elementos visuales sin relación con la tarea o ocultar contenido con estilos ambiguos.
+* **Consecuencia que evita:** La entrega refleja un producto comprensible desde el primer vistazo y cumple con la intención del taller: separar negocio, arquitectura y prototipo en fases verificables.
