@@ -111,7 +111,7 @@ select {
   padding: 0.7rem 1.1rem;
   border-radius: 5px;
   background: var(--laton);
-  color: var(--verde-hondo);
+  color: #071c19;
   font-weight: 700;
   text-align: center;
   text-decoration: none;
@@ -133,6 +133,13 @@ select {
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.08em;
+}
+
+.portada .etiqueta,
+#citas .etiqueta,
+#clientes .etiqueta,
+section.formulario-cita .etiqueta {
+  color: #9f6c2e;
 }
 
 .portada h1 {
@@ -163,6 +170,63 @@ select {
 
 .tarjeta p:not(.etiqueta) {
   color: var(--gris);
+}
+
+.formulario-cita form {
+  display: grid;
+  gap: 16px;
+}
+
+.campo-formulario {
+  display: grid;
+  gap: 5px;
+}
+
+.mensaje-error {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  border-left: 4px solid var(--laton);
+  background: var(--laton-claro);
+  color: var(--verde-hondo);
+  font-weight: 700;
+}
+
+.campo-formulario label {
+  color: var(--verde-hondo);
+  font-weight: 700;
+}
+
+.campo-formulario input,
+.campo-formulario select,
+.campo-formulario textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--borde);
+  border-radius: 4px;
+  background: var(--papel);
+  font: inherit;
+}
+
+.campo-formulario textarea {
+  min-height: 6rem;
+  resize: vertical;
+}
+
+.formulario-cita button[type="submit"] {
+  min-height: 48px;
+  justify-self: start;
+  padding: 0.7rem 1.1rem;
+  border: 0;
+  border-radius: 4px;
+  background: var(--verde-azulejo);
+  color: var(--papel);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.formulario-cita button[type="submit"]:hover {
+  background: var(--verde-hondo);
 }
 
 .cabecera-seccion {

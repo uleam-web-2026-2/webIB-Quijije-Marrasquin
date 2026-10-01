@@ -1,3 +1,7 @@
+<script lang="ts">
+  import Formulario from './Formulario.svelte';
+</script>
+
 <div class="lamina">
   <header class="cabecera">
     <div class="marca">
@@ -79,6 +83,8 @@
         </table>
       </div>
     </section>
+
+    <Formulario />
 
     <section id="clientes" class="tarjeta" aria-labelledby="titulo-clientes">
       <p class="etiqueta">ENTIDAD RELACIONADA: CLIENTE</p>
