@@ -1,8 +1,14 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import type { Session } from '@supabase/supabase-js';
   import Formulario from './Formulario.svelte';
   import { barberiasRegistradas } from './lib/data/barberias';
   import type { Barberia } from './lib/data/barberias';
+  import {
+    obtenerEstilosBase,
+    obtenerUnDisenoConEstilo,
+    type DisenoConEstilo,
+  } from './lib/consultasSupabase';
   import { cargarEnvios, guardarEnvios, type EnvioDiseño } from './lib/envios';
   import {
     cargarDiseños,
@@ -12,8 +18,25 @@
     type DiseñoCorte,
     type EstadoDiseño,
   } from './lib/diseños';
+  import type { EstiloBase } from './tipos';
+  import { supabase } from './lib/supabase';
 
   let diseños = $state<DiseñoCorte[]>([]);
+  let estilosBaseDisponibles = $state<EstiloBase[]>([]);
+  let cargandoEstilos = $state(true);
+  let errorEstilos = $state('');
+  let detalleDiseno = $state<DisenoConEstilo | null>(null);
+  let cargandoDetalle = $state(false);
+  let errorDetalle = $state('');
+  let usuarioAutenticado = $state(false);
+  let correoSesion = $state('');
+  let cargandoSesion = $state(true);
+  let correoAcceso = $state('');
+  let contrasenaAcceso = $state('');
+  let procesandoAutenticacion = $state(false);
+  let mensajeAutenticacion = $state('');
+  let errorAutenticacion = $state(false);
+  let userIdActivo: string | null = null;
   let diseñoSeleccionado = $state<DiseñoCorte | null>(null);
   let versionFormulario = $state(0);
   let errorAlmacenamiento = $state('');
@@ -28,7 +51,130 @@
   let mensajeEnvio = $state('');
   let errorEnvio = $state(false);
 
+  async function cargarEstilosSupabase(): Promise<void> {
+    try {
+      estilosBaseDisponibles = await obtenerEstilosBase();
+    } catch (error) {
+      errorEstilos = error instanceof Error
+        ? `No se pudieron cargar los estilos desde Supabase: ${error.message}`
+        : 'No se pudieron cargar los estilos desde Supabase.';
+    } finally {
+      cargandoEstilos = false;
+    }
+  }
+
+  async function cargarDetalleAutenticado(): Promise<void> {
+    cargandoDetalle = true;
+    errorDetalle = '';
+    try {
+      detalleDiseno = await obtenerUnDisenoConEstilo();
+    } catch (error) {
+      errorDetalle = error instanceof Error
+        ? `No se pudo cargar el detalle relacionado desde Supabase: ${error.message}`
+        : 'No se pudo cargar el detalle relacionado desde Supabase.';
+    } finally {
+      cargandoDetalle = false;
+    }
+  }
+
+  function actualizarSesion(session: Session | null): void {
+    const nuevoUserId = session?.user.id ?? null;
+    usuarioAutenticado = nuevoUserId !== null;
+    correoSesion = session?.user.email ?? '';
+
+    if (nuevoUserId === userIdActivo) return;
+    userIdActivo = nuevoUserId;
+
+    if (nuevoUserId) {
+      void cargarDetalleAutenticado();
+    } else {
+      detalleDiseno = null;
+      errorDetalle = '';
+      cargandoDetalle = false;
+    }
+  }
+
+  function explicarErrorAutenticacion(error: Error): string {
+    const mensaje = error.message.toLowerCase();
+    if (mensaje.includes('invalid login credentials')) {
+      return 'El correo o la contraseña no son correctos.';
+    }
+    if (mensaje.includes('email not confirmed')) {
+      return 'Confirma tu correo antes de iniciar sesión.';
+    }
+    return `No se pudo completar la autenticación: ${error.message}`;
+  }
+
+  async function iniciarSesion(event: SubmitEvent): Promise<void> {
+    event.preventDefault();
+    procesandoAutenticacion = true;
+    mensajeAutenticacion = '';
+    errorAutenticacion = false;
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: correoAcceso.trim(),
+        password: contrasenaAcceso,
+      });
+
+      if (error) throw error;
+      actualizarSesion(data.session);
+      contrasenaAcceso = '';
+      mensajeAutenticacion = 'Sesión iniciada correctamente.';
+    } catch (error) {
+      errorAutenticacion = true;
+      mensajeAutenticacion = error instanceof Error
+        ? explicarErrorAutenticacion(error)
+        : 'No se pudo iniciar sesión. Revisa tus credenciales e inténtalo nuevamente.';
+    } finally {
+      procesandoAutenticacion = false;
+    }
+  }
+
+  async function cerrarSesion(): Promise<void> {
+    procesandoAutenticacion = true;
+    mensajeAutenticacion = '';
+    errorAutenticacion = false;
+
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      actualizarSesion(null);
+      mensajeAutenticacion = 'Sesión cerrada correctamente.';
+    } catch (error) {
+      errorAutenticacion = true;
+      mensajeAutenticacion = error instanceof Error
+        ? explicarErrorAutenticacion(error)
+        : 'No se pudo cerrar la sesión. Inténtalo nuevamente.';
+    } finally {
+      procesandoAutenticacion = false;
+    }
+  }
+
   onMount(() => {
+    void cargarEstilosSupabase();
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      queueMicrotask(() => {
+        actualizarSesion(session);
+        cargandoSesion = false;
+      });
+    });
+
+    void supabase.auth.getSession()
+      .then(({ data, error }) => {
+        if (error) throw error;
+        actualizarSesion(data.session);
+      })
+      .catch((error: unknown) => {
+        errorAutenticacion = true;
+        mensajeAutenticacion = error instanceof Error
+          ? explicarErrorAutenticacion(error)
+          : 'No se pudo recuperar la sesión.';
+      })
+      .finally(() => {
+        cargandoSesion = false;
+      });
+
     try {
       diseños = cargarDiseños();
     } catch (error) {
@@ -52,6 +198,8 @@
         ? `No se pudieron cargar los envíos locales: ${error.message}`
         : 'No se pudieron cargar los envíos locales.';
     }
+
+    return () => authListener.subscription.unsubscribe();
   });
 
   function guardarDiseño(
@@ -224,8 +372,102 @@
     <Formulario
       diseñoSeleccionado={diseñoSeleccionado}
       versionFormulario={versionFormulario}
+      estilosBaseDisponibles={estilosBaseDisponibles}
+      cargandoEstilos={cargandoEstilos}
+      errorEstilos={errorEstilos}
       onGuardar={guardarDiseño}
     />
+
+    <section id="acceso" class="tarjeta formulario-diseno" aria-labelledby="titulo-acceso">
+      <p class="etiqueta">CUENTA DE CLIENTE</p>
+      <h2 id="titulo-acceso">{usuarioAutenticado ? 'Sesión activa' : 'Iniciar sesión'}</h2>
+      {#if cargandoSesion}
+        <p role="status">Comprobando sesión...</p>
+      {:else if usuarioAutenticado}
+        <p>Sesión iniciada como {correoSesion}.</p>
+        <button
+          class="accion-seleccion"
+          type="button"
+          onclick={cerrarSesion}
+          disabled={procesandoAutenticacion}
+        >
+          {procesandoAutenticacion ? 'Cerrando sesión...' : 'Cerrar sesión'}
+        </button>
+      {:else}
+        <form onsubmit={iniciarSesion}>
+          <div class="campo-formulario">
+            <label for="correo-acceso">Correo electrónico</label>
+            <input
+              id="correo-acceso"
+              name="email"
+              type="email"
+              autocomplete="username"
+              required
+              bind:value={correoAcceso}
+            />
+          </div>
+          <div class="campo-formulario">
+            <label for="contrasena-acceso">Contraseña</label>
+            <input
+              id="contrasena-acceso"
+              name="password"
+              type="password"
+              autocomplete="current-password"
+              required
+              bind:value={contrasenaAcceso}
+            />
+          </div>
+          <button type="submit" disabled={procesandoAutenticacion}>
+            {procesandoAutenticacion ? 'Iniciando sesión...' : 'Iniciar sesión'}
+          </button>
+        </form>
+      {/if}
+      {#if mensajeAutenticacion}
+        <p class={errorAutenticacion ? 'mensaje-error' : ''} role={errorAutenticacion ? 'alert' : 'status'}>
+          {mensajeAutenticacion}
+        </p>
+      {/if}
+    </section>
+
+    <section id="detalle-diseno" class="tarjeta" aria-labelledby="titulo-detalle-diseno">
+      <div class="cabecera-seccion">
+        <div>
+          <p class="etiqueta">DETALLE RELACIONADO</p>
+          <h2 id="titulo-detalle-diseno">Diseño y estilo base</h2>
+        </div>
+      </div>
+
+      {#if cargandoSesion}
+        <p role="status">Comprobando sesión...</p>
+      {:else if !usuarioAutenticado}
+        <p>Inicia sesión para consultar los diseños autorizados para tu cuenta.</p>
+      {:else if cargandoDetalle}
+        <p role="status">Cargando detalle desde Supabase...</p>
+      {:else if errorDetalle}
+        <p class="mensaje-error" role="alert">{errorDetalle}</p>
+        <p>Comprueba que exista una política SELECT adecuada para disenos_corte y que la relación con estilos_base sea accesible.</p>
+      {:else if detalleDiseno}
+        <article class="tarjeta" aria-labelledby="titulo-registro-relacionado">
+          <h2 id="titulo-registro-relacionado">{detalleDiseno.nombre_diseno}</h2>
+          <p><strong>Estado:</strong> {detalleDiseno.estado_diseno}</p>
+          <p><strong>Cliente (ID):</strong> {detalleDiseno.id_cliente}</p>
+          <p><strong>Estilo base:</strong> {detalleDiseno.estilos_base?.nombre ?? 'Sin estilo relacionado'}</p>
+          {#if detalleDiseno.estilos_base}
+            <p><strong>Descripción del estilo:</strong> {detalleDiseno.estilos_base.descripcion}</p>
+          {/if}
+          <p><strong>Degradado:</strong> {detalleDiseno.tipo_degradado ?? 'No especificado'}</p>
+          <p><strong>Longitud superior:</strong> {detalleDiseno.longitud_superior ?? 'No especificada'}</p>
+          <p><strong>Textura:</strong> {detalleDiseno.textura ?? 'No especificada'}</p>
+          <p><strong>Diseño lateral:</strong> {detalleDiseno.diseno_lateral ?? 'No especificado'}</p>
+          <p><strong>Terminación de nuca:</strong> {detalleDiseno.terminacion_nuca ?? 'No especificada'}</p>
+          <p><strong>Estilo de barba:</strong> {detalleDiseno.estilo_barba ?? 'No especificado'}</p>
+          <p><strong>Observaciones:</strong> {detalleDiseno.observaciones ?? 'Sin observaciones'}</p>
+        </article>
+      {:else}
+        <p>No hay un diseño visible con estilo relacionado.</p>
+        <p>El acceso de lectura a disenos_corte depende de una política RLS; los resultados ocultos por RLS pueden aparecer como una lista vacía.</p>
+      {/if}
+    </section>
 
     <section id="barberias" class="tarjeta" aria-labelledby="titulo-barberias">
       <div class="cabecera-seccion">

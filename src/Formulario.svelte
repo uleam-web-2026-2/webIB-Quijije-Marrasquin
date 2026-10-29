@@ -3,7 +3,6 @@
     diseñoVacio,
     diseñosLaterales,
     estilosBarba,
-    estilosBase,
     estaCompleto,
     longitudesSuperiores,
     terminacionesNuca,
@@ -12,6 +11,7 @@
     type CaracteristicasDiseño,
     type DiseñoCorte,
   } from './lib/diseños';
+  import type { EstiloBase } from './tipos';
 
   interface ResultadoGuardado {
     diseño?: DiseñoCorte;
@@ -21,10 +21,16 @@
   let {
     diseñoSeleccionado,
     versionFormulario,
+    estilosBaseDisponibles,
+    cargandoEstilos,
+    errorEstilos,
     onGuardar,
   }: {
     diseñoSeleccionado: DiseñoCorte | null;
     versionFormulario: number;
+    estilosBaseDisponibles: EstiloBase[];
+    cargandoEstilos: boolean;
+    errorEstilos: string;
     onGuardar: (
       diseño: CaracteristicasDiseño,
       id: string | null,
@@ -178,14 +184,28 @@
         id="estilo-base"
         name="estiloBase"
         bind:value={formulario.estiloBase}
+        disabled={cargandoEstilos || Boolean(errorEstilos) || estilosBaseDisponibles.length === 0}
         aria-invalid={caracteristicaInvalida(formulario.estiloBase)}
         aria-describedby={caracteristicaInvalida(formulario.estiloBase) ? 'error-estilo-base' : undefined}
       >
-        <option value="">Selecciona un estilo base</option>
-        {#each estilosBase as estilo}
-          <option value={estilo}>{estilo}</option>
+        <option value="">
+          {cargandoEstilos
+            ? 'Cargando estilos...'
+            : errorEstilos
+              ? 'No se pudieron cargar los estilos'
+              : estilosBaseDisponibles.length === 0
+                ? 'No hay estilos disponibles'
+                : 'Selecciona un estilo base'}
+        </option>
+        {#each estilosBaseDisponibles as estilo (estilo.id_estilo)}
+          <option value={estilo.nombre}>{estilo.nombre}</option>
         {/each}
       </select>
+      {#if errorEstilos}
+        <p class="mensaje-error" role="alert">{errorEstilos}</p>
+      {:else if !cargandoEstilos && estilosBaseDisponibles.length === 0}
+        <p role="status">No hay estilos base disponibles.</p>
+      {/if}
       {#if caracteristicaInvalida(formulario.estiloBase)}
         <p id="error-estilo-base" class="mensaje-error">Selecciona un estilo base.</p>
       {/if}
