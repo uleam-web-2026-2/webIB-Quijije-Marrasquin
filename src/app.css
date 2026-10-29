@@ -136,9 +136,11 @@ select {
 }
 
 .portada .etiqueta,
-#citas .etiqueta,
-#clientes .etiqueta,
-section.formulario-cita .etiqueta {
+#disenos .etiqueta,
+#barberias .etiqueta,
+#envio .etiqueta,
+#panel-barberia .etiqueta,
+section.formulario-diseno .etiqueta {
   color: #9f6c2e;
 }
 
@@ -172,7 +174,7 @@ section.formulario-cita .etiqueta {
   color: var(--gris);
 }
 
-.formulario-cita form {
+.formulario-diseno form {
   display: grid;
   gap: 16px;
 }
@@ -213,7 +215,8 @@ section.formulario-cita .etiqueta {
   resize: vertical;
 }
 
-.formulario-cita button[type="submit"] {
+.formulario-diseno button[type="submit"],
+.accion-seleccion {
   min-height: 48px;
   justify-self: start;
   padding: 0.7rem 1.1rem;
@@ -225,7 +228,8 @@ section.formulario-cita .etiqueta {
   cursor: pointer;
 }
 
-.formulario-cita button[type="submit"]:hover {
+.formulario-diseno button[type="submit"]:hover,
+.accion-seleccion:hover {
   background: var(--verde-hondo);
 }
 
@@ -294,24 +298,19 @@ td a {
   font-weight: 700;
 }
 
-.estado-solicitada {
+.estado-borrador {
   background: var(--laton-claro);
   color: var(--verde-hondo);
 }
 
-.estado-aceptada {
+.estado-finalizado {
   background: var(--verde-suave);
   color: var(--verde-ok);
 }
 
-.estado-proceso {
+.estado-personalizado {
   background: #e4edf0;
   color: var(--verde-hondo);
-}
-
-.estado-completada {
-  background: var(--menta);
-  color: var(--gris);
 }
 
 .pie {
