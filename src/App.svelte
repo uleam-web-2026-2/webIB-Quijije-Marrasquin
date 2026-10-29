@@ -6,7 +6,8 @@
   import type { Barberia } from './lib/data/barberias';
   import {
     obtenerEstilosBase,
-    obtenerUnDisenoConEstilo,
+    obtenerDisenosAutorizados,
+    obtenerDisenoConEstiloPorId,
     type DisenoConEstilo,
   } from './lib/consultasSupabase';
   import { cargarEnvios, guardarEnvios, type EnvioDiseño } from './lib/envios';
@@ -18,16 +19,20 @@
     type DiseñoCorte,
     type EstadoDiseño,
   } from './lib/diseños';
-  import type { EstiloBase } from './tipos';
+  import type { DisenoCorte as DisenoCorteSupabase, EstiloBase } from './tipos';
   import { supabase } from './lib/supabase';
 
   let diseños = $state<DiseñoCorte[]>([]);
   let estilosBaseDisponibles = $state<EstiloBase[]>([]);
   let cargandoEstilos = $state(true);
   let errorEstilos = $state('');
+  let disenosSupabase = $state<DisenoCorteSupabase[]>([]);
+  let cargandoDisenosSupabase = $state(false);
+  let errorDisenosSupabase = $state('');
   let detalleDiseno = $state<DisenoConEstilo | null>(null);
   let cargandoDetalle = $state(false);
   let errorDetalle = $state('');
+  let idDisenoSeleccionado = $state<string | null>(null);
   let usuarioAutenticado = $state(false);
   let correoSesion = $state('');
   let cargandoSesion = $state(true);
@@ -63,17 +68,57 @@
     }
   }
 
-  async function cargarDetalleAutenticado(): Promise<void> {
+  async function cargarDisenosSupabase(userId: string): Promise<void> {
+    disenosSupabase = [];
+    detalleDiseno = null;
+    idDisenoSeleccionado = null;
+    errorDisenosSupabase = '';
+    errorDetalle = '';
+    cargandoDisenosSupabase = true;
+    cargandoDetalle = false;
+
+    try {
+      const resultados = await obtenerDisenosAutorizados();
+      if (userId === userIdActivo) {
+        disenosSupabase = resultados;
+      }
+    } catch (error) {
+      if (userId === userIdActivo) {
+        errorDisenosSupabase = error instanceof Error
+          ? `No se pudieron cargar los diseños autorizados desde Supabase: ${error.message}`
+          : 'No se pudieron cargar los diseños autorizados desde Supabase.';
+      }
+    } finally {
+      if (userId === userIdActivo) {
+        cargandoDisenosSupabase = false;
+      }
+    }
+  }
+
+  async function verDetalleDiseno(idDiseno: string): Promise<void> {
+    const userId = userIdActivo;
+    if (!userId) return;
+
+    idDisenoSeleccionado = idDiseno;
+    detalleDiseno = null;
     cargandoDetalle = true;
     errorDetalle = '';
+
     try {
-      detalleDiseno = await obtenerUnDisenoConEstilo();
+      const resultado = await obtenerDisenoConEstiloPorId(idDiseno);
+      if (userId === userIdActivo && idDiseno === idDisenoSeleccionado) {
+        detalleDiseno = resultado;
+      }
     } catch (error) {
-      errorDetalle = error instanceof Error
-        ? `No se pudo cargar el detalle relacionado desde Supabase: ${error.message}`
-        : 'No se pudo cargar el detalle relacionado desde Supabase.';
+      if (userId === userIdActivo && idDiseno === idDisenoSeleccionado) {
+        errorDetalle = error instanceof Error
+          ? `No se pudo cargar el detalle relacionado desde Supabase: ${error.message}`
+          : 'No se pudo cargar el detalle relacionado desde Supabase.';
+      }
     } finally {
-      cargandoDetalle = false;
+      if (userId === userIdActivo && idDiseno === idDisenoSeleccionado) {
+        cargandoDetalle = false;
+      }
     }
   }
 
@@ -86,9 +131,13 @@
     userIdActivo = nuevoUserId;
 
     if (nuevoUserId) {
-      void cargarDetalleAutenticado();
+      void cargarDisenosSupabase(nuevoUserId);
     } else {
+      disenosSupabase = [];
+      cargandoDisenosSupabase = false;
+      errorDisenosSupabase = '';
       detalleDiseno = null;
+      idDisenoSeleccionado = null;
       errorDetalle = '';
       cargandoDetalle = false;
     }
@@ -429,45 +478,85 @@
       {/if}
     </section>
 
-    <section id="detalle-diseno" class="tarjeta" aria-labelledby="titulo-detalle-diseno">
-      <div class="cabecera-seccion">
-        <div>
-          <p class="etiqueta">DETALLE RELACIONADO</p>
-          <h2 id="titulo-detalle-diseno">Diseño y estilo base</h2>
+    {#if !cargandoSesion && usuarioAutenticado}
+      <section id="disenos-supabase" class="tarjeta" aria-labelledby="titulo-disenos-supabase">
+        <div class="cabecera-seccion">
+          <div>
+            <p class="etiqueta">DATOS AUTORIZADOS POR SUPABASE</p>
+            <h2 id="titulo-disenos-supabase">Diseños de Supabase</h2>
+          </div>
         </div>
-      </div>
 
-      {#if cargandoSesion}
-        <p role="status">Comprobando sesión...</p>
-      {:else if !usuarioAutenticado}
-        <p>Inicia sesión para consultar los diseños autorizados para tu cuenta.</p>
-      {:else if cargandoDetalle}
-        <p role="status">Cargando detalle desde Supabase...</p>
-      {:else if errorDetalle}
-        <p class="mensaje-error" role="alert">{errorDetalle}</p>
-        <p>Comprueba que exista una política SELECT adecuada para disenos_corte y que la relación con estilos_base sea accesible.</p>
-      {:else if detalleDiseno}
-        <article class="tarjeta" aria-labelledby="titulo-registro-relacionado">
-          <h2 id="titulo-registro-relacionado">{detalleDiseno.nombre_diseno}</h2>
-          <p><strong>Estado:</strong> {detalleDiseno.estado_diseno}</p>
-          <p><strong>Cliente (ID):</strong> {detalleDiseno.id_cliente}</p>
-          <p><strong>Estilo base:</strong> {detalleDiseno.estilos_base?.nombre ?? 'Sin estilo relacionado'}</p>
-          {#if detalleDiseno.estilos_base}
-            <p><strong>Descripción del estilo:</strong> {detalleDiseno.estilos_base.descripcion}</p>
-          {/if}
-          <p><strong>Degradado:</strong> {detalleDiseno.tipo_degradado ?? 'No especificado'}</p>
-          <p><strong>Longitud superior:</strong> {detalleDiseno.longitud_superior ?? 'No especificada'}</p>
-          <p><strong>Textura:</strong> {detalleDiseno.textura ?? 'No especificada'}</p>
-          <p><strong>Diseño lateral:</strong> {detalleDiseno.diseno_lateral ?? 'No especificado'}</p>
-          <p><strong>Terminación de nuca:</strong> {detalleDiseno.terminacion_nuca ?? 'No especificada'}</p>
-          <p><strong>Estilo de barba:</strong> {detalleDiseno.estilo_barba ?? 'No especificado'}</p>
-          <p><strong>Observaciones:</strong> {detalleDiseno.observaciones ?? 'Sin observaciones'}</p>
-        </article>
-      {:else}
-        <p>No hay un diseño visible con estilo relacionado.</p>
-        <p>El acceso de lectura a disenos_corte depende de una política RLS; los resultados ocultos por RLS pueden aparecer como una lista vacía.</p>
-      {/if}
-    </section>
+        {#if cargandoDisenosSupabase}
+          <p role="status">Cargando diseños desde Supabase...</p>
+        {:else if errorDisenosSupabase}
+          <p class="mensaje-error" role="alert">{errorDisenosSupabase}</p>
+        {:else if disenosSupabase.length === 0}
+          <p role="status">No hay diseños autorizados disponibles para esta cuenta.</p>
+        {:else}
+          <div class="tabla-scroll">
+            <table>
+              <caption>Diseños obtenidos de Supabase y visibles según las políticas RLS</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Diseño</th>
+                  <th scope="col">Estado</th>
+                  <th scope="col">Creado</th>
+                  <th scope="col">Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                {#each disenosSupabase as diseno (diseno.id_diseno)}
+                  <tr>
+                    <td data-label="Diseño">{diseno.nombre_diseno}</td>
+                    <td data-label="Estado">{diseno.estado_diseno}</td>
+                    <td data-label="Creado">{new Date(diseno.creado_en).toLocaleString()}</td>
+                    <td data-label="Acción">
+                      <button
+                        class="accion-seleccion"
+                        type="button"
+                        aria-pressed={idDisenoSeleccionado === diseno.id_diseno}
+                        disabled={cargandoDetalle}
+                        onclick={() => verDetalleDiseno(diseno.id_diseno)}
+                      >
+                        {idDisenoSeleccionado === diseno.id_diseno && cargandoDetalle
+                          ? 'Cargando detalle...'
+                          : 'Ver detalle'}
+                      </button>
+                    </td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        {/if}
+
+        {#if errorDetalle}
+          <p class="mensaje-error" role="alert">{errorDetalle}</p>
+        {:else if cargandoDetalle}
+          <p role="status">Cargando detalle relacionado desde Supabase...</p>
+        {:else if idDisenoSeleccionado && !detalleDiseno}
+          <p role="status">El diseño seleccionado ya no está disponible para esta cuenta.</p>
+        {:else if detalleDiseno}
+          <article class="tarjeta" aria-labelledby="titulo-registro-relacionado">
+            <p class="etiqueta">DETALLE RELACIONADO</p>
+            <h2 id="titulo-registro-relacionado">{detalleDiseno.nombre_diseno}</h2>
+            <p><strong>Estado:</strong> {detalleDiseno.estado_diseno}</p>
+            <p><strong>Estilo base:</strong> {detalleDiseno.estilos_base?.nombre ?? 'Sin estilo relacionado'}</p>
+            {#if detalleDiseno.estilos_base}
+              <p><strong>Descripción del estilo:</strong> {detalleDiseno.estilos_base.descripcion}</p>
+            {/if}
+            <p><strong>Degradado:</strong> {detalleDiseno.tipo_degradado ?? 'No especificado'}</p>
+            <p><strong>Longitud superior:</strong> {detalleDiseno.longitud_superior ?? 'No especificada'}</p>
+            <p><strong>Textura:</strong> {detalleDiseno.textura ?? 'No especificada'}</p>
+            <p><strong>Diseño lateral:</strong> {detalleDiseno.diseno_lateral ?? 'No especificado'}</p>
+            <p><strong>Terminación de nuca:</strong> {detalleDiseno.terminacion_nuca ?? 'No especificada'}</p>
+            <p><strong>Estilo de barba:</strong> {detalleDiseno.estilo_barba ?? 'No especificado'}</p>
+            <p><strong>Observaciones:</strong> {detalleDiseno.observaciones ?? 'Sin observaciones'}</p>
+          </article>
+        {/if}
+      </section>
+    {/if}
 
     <section id="barberias" class="tarjeta" aria-labelledby="titulo-barberias">
       <div class="cabecera-seccion">

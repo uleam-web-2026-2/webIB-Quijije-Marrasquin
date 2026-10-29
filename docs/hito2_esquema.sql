@@ -1,5 +1,6 @@
 -- Esquema relacional de Corte Ideal — Diseña tu propio estilo.
--- Este archivo define tablas y restricciones; no inserta datos ni crea políticas RLS.
+-- Este archivo documenta tablas, restricciones y políticas SELECT existentes;
+-- no inserta datos y no debe ejecutarse como parte de esta actualización local.
 
 -- Clientes de la aplicación. usuario_id puede ser NULL para registros de demostración.
 CREATE TABLE IF NOT EXISTS public.clientes (
@@ -86,10 +87,43 @@ CREATE TABLE IF NOT EXISTS public.envios_diseno (
 COMMENT ON TABLE public.envios_diseno IS
   'Registro de cada envío de un diseño a una barbería, con una copia de las características enviadas. La inmutabilidad debe protegerse mediante reglas de acceso.';
 
--- RLS queda habilitado sin políticas: las operaciones quedan denegadas hasta
--- que se definan políticas específicas de lectura y creación.
+-- RLS está habilitado en las cinco tablas.
 ALTER TABLE public.clientes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.estilos_base ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.disenos_corte ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.barberias ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.envios_diseno ENABLE ROW LEVEL SECURITY;
+
+-- Políticas SELECT que, según la configuración confirmada, ya existen en Supabase.
+-- Los nombres siguientes son descriptivos para este archivo; no se pudo verificar
+-- si coinciden exactamente con los nombres usados en el proyecto remoto.
+CREATE POLICY estilos_base_select_publico
+  ON public.estilos_base
+  FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+CREATE POLICY barberias_select_publico
+  ON public.barberias
+  FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+CREATE POLICY clientes_select_perfil_propio
+  ON public.clientes
+  FOR SELECT
+  TO authenticated
+  USING (usuario_id = (SELECT auth.uid()));
+
+CREATE POLICY disenos_corte_select_propios
+  ON public.disenos_corte
+  FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.clientes AS cliente
+      WHERE cliente.id_cliente = disenos_corte.id_cliente
+        AND cliente.usuario_id = (SELECT auth.uid())
+    )
+  );

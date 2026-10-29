@@ -18,12 +18,20 @@ El archivo SQL documenta la definición del esquema y no es evidencia por sí so
 
 ## 2. Vista × consulta
 
-| Vista/interfaz implementada | Consulta Supabase | Estado |
-|---|---|---|
-| Formulario de personalización — selector “Estilo base” | `estilos_base`: `.select('*').order('nombre')`, mediante `obtenerEstilosBase()` en `src/lib/consultasSupabase.ts`. | Implementada y confirmada previamente con HTTP 200 y ocho registros. El formulario muestra carga, error y resultado vacío; no sustituye una falla con datos locales. |
-| “Detalle relacionado — Diseño y estilo base” | `disenos_corte` con la relación `estilos_base(...)`, orden por `creado_en` descendente y límite de un registro, mediante `obtenerUnDisenoConEstilo()` en `src/lib/consultasSupabase.ts`. | Completada y comprobada en el navegador con sesión autenticada: se muestra el diseño real «Mi corte R7», su estado `Finalizado` y el estilo relacionado «Taper Fade». La consulta respeta RLS. Evidencia: [demostracion-2-detalle-relacionado.png](./hito2_capturas/demostracion-2-detalle-relacionado.png). |
+| Vista | Tabla o consulta | ¿Funciona actualmente con Supabase? | Observaciones |
+|---|---|---|---|
+| Formulario de personalización — selector “Estilo base” | `estilos_base`: `.select('*').order('nombre')`, mediante `obtenerEstilosBase()` en `src/lib/consultasSupabase.ts`. | Sí | Consulta real; el formulario presenta estados de carga, error y lista vacía. El guardado del diseño permanece local. |
+| Diseños de Supabase — listado y detalle relacionado | Listado de `disenos_corte` ordenado por `creado_en` mediante `obtenerDisenosAutorizados()`. Al pulsar «Ver detalle», consulta por `id_diseno` y obtiene la relación `estilos_base(...)` mediante `obtenerDisenoConEstiloPorId()`, en `src/lib/consultasSupabase.ts`. | Sí | Requiere sesión autenticada. RLS limita la lista a los diseños autorizados; el estado se muestra como texto. La captura del detalle de «Mi corte R7» y «Taper Fade» está en [demostracion-2-detalle-relacionado.png](./hito2_capturas/demostracion-2-detalle-relacionado.png). |
+| Inicio de sesión — cuenta de cliente | Supabase Auth: `signInWithPassword()` y `signOut()`. | Sí | Autenticación real de Supabase; no corresponde a una tabla del esquema público. |
+| Mis diseños — diseños guardados | `localStorage`, mediante `cargarDiseños()` y `guardarDiseños()` de `src/lib/diseños.ts`. | Plan | Fichas locales; no se consultan desde Supabase. Es una vista independiente del listado “Diseños de Supabase”. |
+| Barberías — selección de barbería | Datos locales de `barberiasRegistradas`, importados desde `src/lib/data/barberias.ts`. | Plan | No consulta `public.barberias` desde esta vista. |
+| Enviar diseño — revisión y envío | Diseños y envíos locales, mediante `src/lib/envios.ts` y el estado de `App.svelte`. | Plan | No inserta ni consulta registros de `envios_diseno` en Supabase. |
+| Panel de barbería — diseños recibidos | Envíos locales cargados desde `localStorage` mediante `cargarEnvios()`. | Plan | Muestra los registros locales; no consulta `public.envios_diseno`. |
+| Citas de hoy — Barbero (vista documentada para el Hito 1) | No corresponde a una tabla o consulta del modelo actual de Corte Ideal. | Plan | Vista del modelo anterior descrita en `docs/ficha_negocio.md`, sección 7; no existe en la aplicación actual. |
+| Solicitar una cita — Cliente (vista documentada para el Hito 1) | No corresponde a una tabla o consulta del modelo actual de Corte Ideal. | Plan | Vista del modelo anterior descrita en `docs/ficha_negocio.md`, sección 7; el formulario actual personaliza diseños y no gestiona citas. |
+| Clientes (vista relacionada del Hito 1) | No corresponde a una vista actual; el acceso a `public.clientes` se realiza mediante las políticas RLS y no mediante una pantalla de listado. | Plan | La vista relacionada se menciona en `docs/ficha_negocio.md`, sección 7; no existe como pantalla independiente en `App.svelte`. |
 
-La relación consultada en el detalle es la clave foránea `disenos_corte.id_estilo → estilos_base.id_estilo`. La lectura pública de `estilos_base` permite seleccionar el nombre del estilo en el formulario. La tabla de barberías que se presenta actualmente en otra sección de la aplicación procede de datos TypeScript locales; no se presenta aquí como una consulta Supabase implementada.
+La relación consultada en el detalle es la clave foránea `disenos_corte.id_estilo → estilos_base.id_estilo`. La lectura pública de `estilos_base` permite seleccionar el nombre del estilo en el formulario. Las vistas del Hito 1 se identificaron en `docs/ficha_negocio.md`, sección 7; corresponden al modelo anterior de citas y se conservan aquí como referencia, sin presentarlas como funcionalidades vigentes. Las demás vistas se identificaron en los enlaces de navegación y secciones de `src/App.svelte`.
 
 ## 3. Matriz rol × tabla × operación
 
@@ -63,7 +71,7 @@ La asociación de Carlos con un usuario de Supabase Auth y la visualización aut
 | Políticas SELECT para usuarios autenticados en `clientes` y `disenos_corte` | Completado | Confirmadas y utilizadas para mostrar el detalle relacionado con sesión autenticada, respetando RLS. |
 | Otras políticas privadas y políticas de creación para datos asociados a usuarios | Pendiente | Responsabilidad del compañero; no se atribuyen permisos que todavía no existen. |
 | Demostración 1 — Contrato de datos | Completado | Esquema, relaciones, interfaces y permisos actuales documentados. |
-| Demostración 2 — Listado y detalle | Completado | Listado real y detalle relacionado confirmados; la captura del detalle autenticado está guardada en `docs/hito2_capturas/demostracion-2-detalle-relacionado.png`. |
+| Demostración 2 — Listado y detalle | Completado | La sesión autenticada muestra diseños consultados desde Supabase y autorizados por RLS; cada diseño ofrece «Ver detalle», que consulta su `id_diseno` y presenta el estilo relacionado de `estilos_base` y el estado como texto. Evidencia del detalle: `docs/hito2_capturas/demostracion-2-detalle-relacionado.png`. |
 | Demostraciones 3 y 4 | Pendiente | A cargo del compañero, según la división de trabajo del equipo. No se detallan funcionalidades que no fueron especificadas en este alcance. |
 
 **Declaración de herramientas:** GitHub Copilot y ChatGPT se utilizaron como herramientas de apoyo para el desarrollo y la redacción de documentación. Esta declaración no reemplaza la revisión del equipo ni atribuye a esas herramientas la ejecución o verificación de políticas, datos o consultas no comprobadas.
