@@ -11,10 +11,15 @@
     type CaracteristicasDiseño,
     type DiseñoCorte,
   } from './lib/diseños';
-  import type { EstiloBase } from './tipos';
+  import type { DisenoCorte as DisenoCorteSupabase, EstiloBase } from './tipos';
 
   interface ResultadoGuardado {
     diseño?: DiseñoCorte;
+    error?: string;
+  }
+
+  interface ResultadoGuardadoSupabase {
+    diseno?: DisenoCorteSupabase;
     error?: string;
   }
 
@@ -25,6 +30,7 @@
     cargandoEstilos,
     errorEstilos,
     onGuardar,
+    onGuardarSupabase,
   }: {
     diseñoSeleccionado: DiseñoCorte | null;
     versionFormulario: number;
@@ -36,6 +42,9 @@
       id: string | null,
       finalizar: boolean,
     ) => ResultadoGuardado;
+    onGuardarSupabase: (
+      diseño: CaracteristicasDiseño,
+    ) => Promise<ResultadoGuardadoSupabase>;
   } = $props();
 
   let formulario = $state<CaracteristicasDiseño>(diseñoVacio());
@@ -44,6 +53,8 @@
   let esError = $state(false);
   let intentoGuardar = $state(false);
   let intentoFinalizar = $state(false);
+  let intentoGuardarSupabase = $state(false);
+  let procesandoGuardadoSupabase = $state(false);
   let ultimaVersionFormulario = 0;
 
   $effect(() => {
@@ -66,6 +77,7 @@
       esError = false;
       intentoGuardar = false;
       intentoFinalizar = false;
+      intentoGuardarSupabase = false;
       ultimaVersionFormulario = versionFormulario;
     } else if (versionFormulario !== ultimaVersionFormulario) {
       formulario = diseñoVacio();
@@ -74,6 +86,7 @@
       esError = false;
       intentoGuardar = false;
       intentoFinalizar = false;
+      intentoGuardarSupabase = false;
       ultimaVersionFormulario = versionFormulario;
     }
   });
@@ -86,23 +99,39 @@
     return intentoFinalizar && !valor.trim();
   }
 
+  function estiloBaseSupabaseInvalido(): boolean {
+    return intentoGuardarSupabase &&
+      Boolean(formulario.estiloBase.trim()) &&
+      !estilosBaseDisponibles.some(
+        (estilo) => estilo.nombre === formulario.estiloBase.trim(),
+      );
+  }
+
   function enviarFormulario(evento: SubmitEvent): void {
     evento.preventDefault();
-    intentoGuardar = true;
-    esError = true;
     const accion = evento.submitter instanceof HTMLButtonElement
       ? evento.submitter.value
       : 'guardar';
-    const finalizar = accion === 'finalizar';
-    intentoFinalizar = finalizar;
 
-    if (!formulario.cliente.trim() || !formulario.nombreDiseño.trim()) {
-      mensaje = 'Escribe el nombre del cliente y el nombre del diseño para guardarlo.';
+    if (accion === 'guardar-supabase') {
+      void guardarEnSupabase();
       return;
     }
 
-    if (finalizar && !estaCompleto(formulario)) {
-      mensaje = 'Completa todas las características obligatorias antes de finalizar el diseño.';
+    intentoGuardarSupabase = false;
+    intentoGuardar = true;
+    esError = true;
+    const finalizar = accion === 'finalizar';
+    intentoFinalizar = finalizar;
+
+    const datosBasicosValidos = Boolean(
+      formulario.cliente.trim() && formulario.nombreDiseño.trim(),
+    );
+    const caracteristicasValidas = !finalizar || estaCompleto(formulario);
+    if (!datosBasicosValidos || !caracteristicasValidas) {
+      mensaje = !datosBasicosValidos
+        ? 'Escribe el nombre del cliente y el nombre del diseño para guardarlo.'
+        : 'Completa todas las características obligatorias antes de finalizar el diseño.';
       return;
     }
 
@@ -136,6 +165,36 @@
       mensaje = resultado.diseño.estado === 'Personalizado'
         ? 'Diseño personalizado guardado correctamente.'
         : 'Borrador guardado correctamente. Puedes continuar editándolo.';
+    }
+  }
+
+  async function guardarEnSupabase(): Promise<void> {
+    if (procesandoGuardadoSupabase) return;
+
+    intentoGuardar = true;
+    intentoFinalizar = false;
+    intentoGuardarSupabase = true;
+    esError = true;
+    mensaje = '';
+    procesandoGuardadoSupabase = true;
+
+    try {
+      const resultado = await onGuardarSupabase({ ...formulario });
+      if (resultado.error || !resultado.diseno) {
+        mensaje = resultado.error ?? 'No se pudo guardar el diseño en Supabase.';
+        return;
+      }
+
+      esError = false;
+      intentoGuardar = false;
+      intentoGuardarSupabase = false;
+      mensaje = 'Diseño guardado en Supabase correctamente.';
+    } catch (error) {
+      mensaje = error instanceof Error
+        ? `No se pudo guardar el diseño en Supabase: ${error.message}`
+        : 'No se pudo guardar el diseño en Supabase. Revisa tu conexión e inténtalo nuevamente.';
+    } finally {
+      procesandoGuardadoSupabase = false;
     }
   }
 </script>
@@ -185,8 +244,8 @@
         name="estiloBase"
         bind:value={formulario.estiloBase}
         disabled={cargandoEstilos || Boolean(errorEstilos) || estilosBaseDisponibles.length === 0}
-        aria-invalid={caracteristicaInvalida(formulario.estiloBase)}
-        aria-describedby={caracteristicaInvalida(formulario.estiloBase) ? 'error-estilo-base' : undefined}
+        aria-invalid={caracteristicaInvalida(formulario.estiloBase) || estiloBaseSupabaseInvalido()}
+        aria-describedby={caracteristicaInvalida(formulario.estiloBase) || estiloBaseSupabaseInvalido() ? 'error-estilo-base' : undefined}
       >
         <option value="">
           {cargandoEstilos
@@ -208,6 +267,10 @@
       {/if}
       {#if caracteristicaInvalida(formulario.estiloBase)}
         <p id="error-estilo-base" class="mensaje-error">Selecciona un estilo base.</p>
+      {:else if estiloBaseSupabaseInvalido()}
+        <p id="error-estilo-base" class="mensaje-error">
+          El estilo seleccionado no está disponible. Selecciónalo de nuevo o déjalo vacío.
+        </p>
       {/if}
     </div>
 
@@ -341,5 +404,13 @@
 
     <button type="submit" name="accion" value="guardar">Guardar diseño</button>
     <button type="submit" name="accion" value="finalizar">Finalizar diseño</button>
+    <button
+      type="submit"
+      name="accion"
+      value="guardar-supabase"
+      disabled={procesandoGuardadoSupabase}
+    >
+      {procesandoGuardadoSupabase ? 'Guardando en Supabase...' : 'Guardar en Supabase'}
+    </button>
   </form>
 </section>

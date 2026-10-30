@@ -125,3 +125,16 @@ CREATE POLICY "Clientes leen sus propios disenos"
         AND cliente.usuario_id = (SELECT auth.uid())
     )
   );
+
+CREATE POLICY "Clientes crean sus propios disenos"
+  ON public.disenos_corte
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.clientes
+      WHERE clientes.id_cliente = disenos_corte.id_cliente
+        AND clientes.usuario_id = (SELECT auth.uid())
+    )
+  );
