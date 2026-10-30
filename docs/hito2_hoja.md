@@ -75,4 +75,6 @@ La asociación de Carlos con un usuario de Supabase Auth y la visualización aut
 | Demostración 2 — Listado y detalle | Completado | La sesión autenticada muestra diseños consultados desde Supabase y autorizados por RLS; cada diseño ofrece «Ver detalle», que consulta su `id_diseno` y presenta el estilo relacionado de `estilos_base` y el estado como texto. Evidencia del detalle: `docs/hito2_capturas/demostracion-2-detalle-relacionado.png`. |
 | Demostraciones 3 y 4 | Pendiente | A cargo del compañero, según la división de trabajo del equipo. No se detallan funcionalidades que no fueron especificadas en este alcance. |
 
-**Declaración de herramientas:** GitHub Copilot y ChatGPT se utilizaron como herramientas de apoyo para el desarrollo y la redacción de documentación. Esta declaración no reemplaza la revisión del equipo ni atribuye a esas herramientas la ejecución o verificación de políticas, datos o consultas no comprobadas.
+## Declaración de uso de inteligencia artificial
+
+Se utilizaron ChatGPT y GitHub Copilot como herramientas de apoyo durante el desarrollo y la revisión del código, la implementación de funcionalidades, la identificación y corrección de errores, las validaciones y pruebas, y la preparación y organización de evidencias. Las funcionalidades descritas se comprobaron mediante pruebas reales de la aplicación y consultas a Supabase. Estas herramientas no sustituyen la revisión del equipo ni se presentan como responsables de ejecutar o verificar acciones que no estén documentadas.
