@@ -5,9 +5,11 @@
   import { barberiasRegistradas } from './lib/data/barberias';
   import type { Barberia } from './lib/data/barberias';
   import {
+    crearDisenoCorte,
     obtenerEstilosBase,
     obtenerDisenosAutorizados,
     obtenerDisenoConEstiloPorId,
+    obtenerIdClientePorUsuario,
     type DisenoConEstilo,
   } from './lib/consultasSupabase';
   import { cargarEnvios, guardarEnvios, type EnvioDiseño } from './lib/envios';
@@ -34,6 +36,7 @@
   let errorDetalle = $state('');
   let idDisenoSeleccionado = $state<string | null>(null);
   let usuarioAutenticado = $state(false);
+  let creandoDisenoSupabase = false;
   let correoSesion = $state('');
   let cargandoSesion = $state(true);
   let correoAcceso = $state('');
@@ -92,6 +95,77 @@
       if (userId === userIdActivo) {
         cargandoDisenosSupabase = false;
       }
+    }
+  }
+
+  async function guardarDisenoSupabase(
+    datos: CaracteristicasDiseño,
+  ): Promise<{ diseno?: DisenoCorteSupabase; error?: string }> {
+    if (creandoDisenoSupabase) {
+      return { error: 'Ya se está procesando el guardado en Supabase.' };
+    }
+
+    creandoDisenoSupabase = true;
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      if (!sessionData.session) {
+        return { error: 'Inicia sesión con una cuenta autorizada para guardar en Supabase.' };
+      }
+
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      if (!userData.user || userData.user.id !== sessionData.session.user.id) {
+        return { error: 'No se pudo validar tu sesión. Inicia sesión nuevamente.' };
+      }
+      if (userData.user.id !== userIdActivo) {
+        actualizarSesion(sessionData.session);
+      }
+
+      if (!datos.cliente.trim() || !datos.nombreDiseño.trim()) {
+        return { error: 'El nombre del cliente y el nombre del diseño son obligatorios.' };
+      }
+
+      const estiloSeleccionado = datos.estiloBase.trim()
+        ? estilosBaseDisponibles.find((estilo) => estilo.nombre === datos.estiloBase.trim())
+        : undefined;
+      if (datos.estiloBase.trim() && !estiloSeleccionado) {
+        return {
+          error: 'El estilo base seleccionado ya no está disponible. Selecciónalo de nuevo o déjalo vacío.',
+        };
+      }
+
+      const idCliente = await obtenerIdClientePorUsuario(userData.user.id);
+      if (!idCliente) {
+        return {
+          error: 'Tu cuenta no tiene un perfil de cliente asociado. Contacta al administrador.',
+        };
+      }
+
+      const diseno = await crearDisenoCorte({
+        id_cliente: idCliente,
+        id_estilo: estiloSeleccionado?.id_estilo ?? null,
+        nombre_diseno: datos.nombreDiseño.trim(),
+        tipo_degradado: datos.tipoDegradado.trim() || null,
+        longitud_superior: datos.longitudSuperior.trim() || null,
+        textura: datos.textura.trim() || null,
+        diseno_lateral: datos.diseñoLateral.trim() || null,
+        terminacion_nuca: datos.terminacionNuca.trim() || null,
+        estilo_barba: datos.estiloBarba.trim() || null,
+        observaciones: datos.observaciones.trim() || null,
+        estado_diseno: 'Borrador',
+      });
+
+      await cargarDisenosSupabase(userData.user.id);
+      return { diseno };
+    } catch (error) {
+      return {
+        error: error instanceof Error
+          ? `No se pudo guardar el diseño en Supabase: ${error.message}`
+          : 'No se pudo guardar el diseño en Supabase. Revisa tu conexión e inténtalo nuevamente.',
+      };
+    } finally {
+      creandoDisenoSupabase = false;
     }
   }
 
@@ -425,6 +499,7 @@
       cargandoEstilos={cargandoEstilos}
       errorEstilos={errorEstilos}
       onGuardar={guardarDiseño}
+      onGuardarSupabase={guardarDisenoSupabase}
     />
 
     <section id="acceso" class="tarjeta formulario-diseno" aria-labelledby="titulo-acceso">
