@@ -95,27 +95,25 @@ ALTER TABLE public.barberias ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.envios_diseno ENABLE ROW LEVEL SECURITY;
 
 -- Políticas SELECT que, según la configuración confirmada, ya existen en Supabase.
--- Los nombres siguientes son descriptivos para este archivo; no se pudo verificar
--- si coinciden exactamente con los nombres usados en el proyecto remoto.
-CREATE POLICY estilos_base_select_publico
+CREATE POLICY "Lectura publica de estilos"
   ON public.estilos_base
   FOR SELECT
   TO anon, authenticated
   USING (true);
 
-CREATE POLICY barberias_select_publico
+CREATE POLICY "Lectura publica de barberias"
   ON public.barberias
   FOR SELECT
   TO anon, authenticated
   USING (true);
 
-CREATE POLICY clientes_select_perfil_propio
+CREATE POLICY "Clientes leen su propio perfil"
   ON public.clientes
   FOR SELECT
   TO authenticated
   USING (usuario_id = (SELECT auth.uid()));
 
-CREATE POLICY disenos_corte_select_propios
+CREATE POLICY "Clientes leen sus propios disenos"
   ON public.disenos_corte
   FOR SELECT
   TO authenticated
