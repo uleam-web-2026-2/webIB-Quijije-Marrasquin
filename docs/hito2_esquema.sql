@@ -138,3 +138,59 @@ CREATE POLICY "Clientes crean sus propios disenos"
         AND clientes.usuario_id = (SELECT auth.uid())
     )
   );
+
+-- Semana 10, Fase 1: permitir cambiar el estado de los diseños propios.
+-- Limitar los permisos directos de anon y authenticated a la columna de estado.
+REVOKE UPDATE
+  ON TABLE public.disenos_corte
+  FROM anon, authenticated;
+
+-- Retirar también posibles permisos UPDATE concedidos previamente por columna.
+REVOKE UPDATE (
+  id_diseno,
+  id_cliente,
+  id_estilo,
+  nombre_diseno,
+  tipo_degradado,
+  longitud_superior,
+  textura,
+  diseno_lateral,
+  terminacion_nuca,
+  estilo_barba,
+  observaciones,
+  estado_diseno,
+  creado_en,
+  actualizado_en
+)
+  ON TABLE public.disenos_corte
+  FROM anon, authenticated;
+
+GRANT UPDATE (estado_diseno)
+  ON TABLE public.disenos_corte
+  TO authenticated;
+
+-- PostgreSQL no admite CREATE POLICY IF NOT EXISTS; reemplazar esta política
+-- por nombre hace que esta sección pueda aplicarse más de una vez.
+DROP POLICY IF EXISTS "Clientes actualizan sus propios disenos"
+  ON public.disenos_corte;
+
+CREATE POLICY "Clientes actualizan sus propios disenos"
+  ON public.disenos_corte
+  FOR UPDATE
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.clientes AS cliente
+      WHERE cliente.id_cliente = disenos_corte.id_cliente
+        AND cliente.usuario_id = (SELECT auth.uid())
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.clientes AS cliente
+      WHERE cliente.id_cliente = disenos_corte.id_cliente
+        AND cliente.usuario_id = (SELECT auth.uid())
+    )
+  );

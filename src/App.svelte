@@ -10,6 +10,7 @@
     obtenerDisenosAutorizados,
     obtenerDisenoConEstiloPorId,
     obtenerIdClientePorUsuario,
+    actualizarEstadoDisenoCorte,
     type DisenoConEstilo,
   } from './lib/consultasSupabase';
   import { cargarEnvios, guardarEnvios, type EnvioDiseño } from './lib/envios';
@@ -21,7 +22,7 @@
     type DiseñoCorte,
     type EstadoDiseño,
   } from './lib/diseños';
-  import type { DisenoCorte as DisenoCorteSupabase, EstiloBase } from './tipos';
+  import type { DisenoCorte as DisenoCorteSupabase, EstadoDiseno, EstiloBase } from './tipos';
   import { supabase } from './lib/supabase';
 
   let diseños = $state<DiseñoCorte[]>([]);
@@ -31,6 +32,10 @@
   let disenosSupabase = $state<DisenoCorteSupabase[]>([]);
   let cargandoDisenosSupabase = $state(false);
   let errorDisenosSupabase = $state('');
+  let estadoObjetivoDiseno = $state<Record<string, EstadoDiseno>>({});
+  let actualizandoEstadoDisenoId = $state<string | null>(null);
+  let mensajeActualizacionEstado = $state('');
+  let errorActualizacionEstado = $state(false);
   let detalleDiseno = $state<DisenoConEstilo | null>(null);
   let cargandoDetalle = $state(false);
   let errorDetalle = $state('');
@@ -73,6 +78,7 @@
 
   async function cargarDisenosSupabase(userId: string): Promise<void> {
     disenosSupabase = [];
+    estadoObjetivoDiseno = {};
     detalleDiseno = null;
     idDisenoSeleccionado = null;
     errorDisenosSupabase = '';
@@ -196,6 +202,70 @@
     }
   }
 
+  function estadoDestinoDiseno(idDiseno: string, estadoActual: EstadoDiseno): EstadoDiseno {
+    return estadoObjetivoDiseno[idDiseno] ?? estadoActual;
+  }
+
+  function seleccionarEstadoDiseno(idDiseno: string, valor: string): void {
+    if (
+      valor === 'Borrador' ||
+      valor === 'Personalizado' ||
+      valor === 'Finalizado'
+    ) {
+      estadoObjetivoDiseno[idDiseno] = valor;
+    }
+  }
+
+  function puedeFinalizarDiseno(diseno: DisenoCorteSupabase): boolean {
+    return Boolean(
+      diseno.id_estilo &&
+      diseno.tipo_degradado?.trim() &&
+      diseno.longitud_superior?.trim() &&
+      diseno.textura?.trim() &&
+      diseno.diseno_lateral?.trim() &&
+      diseno.terminacion_nuca?.trim() &&
+      diseno.estilo_barba?.trim(),
+    );
+  }
+
+  async function actualizarEstadoDiseno(diseno: DisenoCorteSupabase): Promise<void> {
+    if (actualizandoEstadoDisenoId) return;
+
+    const nuevoEstado = estadoDestinoDiseno(diseno.id_diseno, diseno.estado_diseno);
+    if (nuevoEstado === diseno.estado_diseno) return;
+    if (nuevoEstado === 'Finalizado' && !puedeFinalizarDiseno(diseno)) {
+      mensajeActualizacionEstado =
+        'Completa el estilo base y todas las características obligatorias antes de finalizar.';
+      errorActualizacionEstado = true;
+      return;
+    }
+
+    actualizandoEstadoDisenoId = diseno.id_diseno;
+    mensajeActualizacionEstado = '';
+    errorActualizacionEstado = false;
+
+    try {
+      const resultado = await actualizarEstadoDisenoCorte(diseno.id_diseno, nuevoEstado);
+      disenosSupabase = disenosSupabase.map((item) =>
+        item.id_diseno === resultado.id_diseno
+          ? { ...item, estado_diseno: resultado.estado_diseno }
+          : item,
+      );
+      if (detalleDiseno?.id_diseno === resultado.id_diseno) {
+        detalleDiseno = { ...detalleDiseno, estado_diseno: resultado.estado_diseno };
+      }
+      estadoObjetivoDiseno[resultado.id_diseno] = resultado.estado_diseno;
+      mensajeActualizacionEstado = `Estado actualizado a ${resultado.estado_diseno}.`;
+    } catch (error) {
+      mensajeActualizacionEstado = error instanceof Error
+        ? `No se pudo confirmar la actualización: ${error.message}`
+        : 'No se pudo confirmar la actualización del diseño. Inténtalo nuevamente.';
+      errorActualizacionEstado = true;
+    } finally {
+      actualizandoEstadoDisenoId = null;
+    }
+  }
+
   function actualizarSesion(session: Session | null): void {
     const nuevoUserId = session?.user.id ?? null;
     usuarioAutenticado = nuevoUserId !== null;
@@ -208,6 +278,7 @@
       void cargarDisenosSupabase(nuevoUserId);
     } else {
       disenosSupabase = [];
+      estadoObjetivoDiseno = {};
       cargandoDisenosSupabase = false;
       errorDisenosSupabase = '';
       detalleDiseno = null;
@@ -569,6 +640,11 @@
         {:else if disenosSupabase.length === 0}
           <p role="status">No hay diseños autorizados disponibles para esta cuenta.</p>
         {:else}
+          {#if mensajeActualizacionEstado}
+            <p class={errorActualizacionEstado ? 'mensaje-error' : ''} role={errorActualizacionEstado ? 'alert' : 'status'}>
+              {mensajeActualizacionEstado}
+            </p>
+          {/if}
           <div class="tabla-scroll">
             <table>
               <caption>Diseños obtenidos de Supabase y visibles según las políticas RLS</caption>
@@ -584,7 +660,40 @@
                 {#each disenosSupabase as diseno (diseno.id_diseno)}
                   <tr>
                     <td data-label="Diseño">{diseno.nombre_diseno}</td>
-                    <td data-label="Estado">{diseno.estado_diseno}</td>
+                    <td data-label="Estado">
+                      <span class={`estado ${claseEstado(diseno.estado_diseno)}`}>{diseno.estado_diseno}</span>
+                      <div class="campo-formulario">
+                        <label for={`estado-diseno-${diseno.id_diseno}`}>
+                          Cambiar estado de {diseno.nombre_diseno}
+                        </label>
+                        <select
+                          id={`estado-diseno-${diseno.id_diseno}`}
+                          value={estadoDestinoDiseno(diseno.id_diseno, diseno.estado_diseno)}
+                          disabled={actualizandoEstadoDisenoId !== null}
+                          onchange={(event) => seleccionarEstadoDiseno(diseno.id_diseno, event.currentTarget.value)}
+                        >
+                          <option value="Borrador">Borrador</option>
+                          <option value="Personalizado">Personalizado</option>
+                          <option value="Finalizado" disabled={!puedeFinalizarDiseno(diseno)}>Finalizado</option>
+                        </select>
+                        {#if !puedeFinalizarDiseno(diseno)}
+                          <small>Completa las características obligatorias para habilitar «Finalizado».</small>
+                        {/if}
+                        <button
+                          class="accion-seleccion"
+                          type="button"
+                          disabled={
+                            actualizandoEstadoDisenoId !== null ||
+                            estadoDestinoDiseno(diseno.id_diseno, diseno.estado_diseno) === diseno.estado_diseno
+                          }
+                          onclick={() => actualizarEstadoDiseno(diseno)}
+                        >
+                          {actualizandoEstadoDisenoId === diseno.id_diseno
+                            ? 'Actualizando...'
+                            : 'Actualizar estado'}
+                        </button>
+                      </div>
+                    </td>
                     <td data-label="Creado">{new Date(diseno.creado_en).toLocaleString()}</td>
                     <td data-label="Acción">
                       <button

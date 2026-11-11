@@ -1,4 +1,4 @@
-import type { Cliente, DisenoCorte, EstiloBase } from '../tipos';
+import type { Cliente, DisenoCorte, EstadoDiseno, EstiloBase } from '../tipos';
 import { supabase } from './supabase';
 
 export interface DisenoConEstilo extends DisenoCorte {
@@ -61,6 +61,37 @@ export async function crearDisenoCorte(
 
   if (error) {
     throw error;
+  }
+
+  return data;
+}
+
+export async function actualizarEstadoDisenoCorte(
+  idDiseno: string,
+  nuevoEstado: EstadoDiseno,
+): Promise<Pick<DisenoCorte, 'id_diseno' | 'estado_diseno'>> {
+  if (!idDiseno.trim()) {
+    throw new Error('El identificador del diseño es obligatorio.');
+  }
+
+  const { data, error } = await supabase
+    .from('disenos_corte')
+    .update({ estado_diseno: nuevoEstado })
+    .eq('id_diseno', idDiseno)
+    .select('id_diseno, estado_diseno')
+    .returns<Pick<DisenoCorte, 'id_diseno' | 'estado_diseno'>[]>()
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error('Supabase no confirmó la actualización de ningún diseño.');
+  }
+
+  if (data.id_diseno !== idDiseno || data.estado_diseno !== nuevoEstado) {
+    throw new Error('La fila devuelta por Supabase no coincide con la actualización solicitada.');
   }
 
   return data;
