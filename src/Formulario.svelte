@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import {
     diseñoVacio,
     diseñosLaterales,
@@ -12,6 +13,18 @@
     type DiseñoCorte,
   } from './lib/diseños';
   import type { DisenoCorte as DisenoCorteSupabase, EstiloBase } from './tipos';
+
+  const claveBorrador = 'corte-ideal-borrador-formulario-v1';
+
+  interface BorradorSesion {
+    estiloBase: string;
+    tipoDegradado: string;
+    longitudSuperior: string;
+    textura: string;
+    diseñoLateral: string;
+    terminacionNuca: string;
+    estiloBarba: string;
+  }
 
   interface ResultadoGuardado {
     diseño?: DiseñoCorte;
@@ -55,7 +68,97 @@
   let intentoFinalizar = $state(false);
   let intentoGuardarSupabase = $state(false);
   let procesandoGuardadoSupabase = $state(false);
+  let borradorListo = $state(false);
+  let errorBorrador = $state('');
+  let versionBorrador = $state(0);
+  let omitirPersistenciaBorrador = false;
   let ultimaVersionFormulario = 0;
+
+  function esOpcion<T extends readonly string[]>(valor: unknown, opciones: T): valor is T[number] {
+    return typeof valor === 'string' && opciones.includes(valor);
+  }
+
+  function esBorradorSesion(valor: unknown): valor is BorradorSesion {
+    if (typeof valor !== 'object' || valor === null) return false;
+    const borrador = valor as Record<string, unknown>;
+    const campos = [
+      'estiloBase',
+      'tipoDegradado',
+      'longitudSuperior',
+      'textura',
+      'diseñoLateral',
+      'terminacionNuca',
+      'estiloBarba',
+    ];
+    return Object.keys(borrador).length === campos.length &&
+      campos.every((campo) => campo in borrador) &&
+      typeof borrador.estiloBase === 'string' &&
+      (borrador.tipoDegradado === '' || esOpcion(borrador.tipoDegradado, tiposDegradado)) &&
+      (borrador.longitudSuperior === '' || esOpcion(borrador.longitudSuperior, longitudesSuperiores)) &&
+      (borrador.textura === '' || esOpcion(borrador.textura, texturas)) &&
+      (borrador.diseñoLateral === '' || esOpcion(borrador.diseñoLateral, diseñosLaterales)) &&
+      (borrador.terminacionNuca === '' || esOpcion(borrador.terminacionNuca, terminacionesNuca)) &&
+      (borrador.estiloBarba === '' || esOpcion(borrador.estiloBarba, estilosBarba));
+  }
+
+  function limpiarBorradorSesion(): void {
+    try {
+      sessionStorage.removeItem(claveBorrador);
+      errorBorrador = '';
+      omitirPersistenciaBorrador = true;
+      versionBorrador += 1;
+    } catch (error) {
+      errorBorrador = error instanceof Error
+        ? `El diseño se guardó, pero no se pudo limpiar el borrador de esta pestaña: ${error.message}`
+        : 'El diseño se guardó, pero no se pudo limpiar el borrador de esta pestaña.';
+    }
+  }
+
+  onMount(() => {
+    try {
+      const guardado = sessionStorage.getItem(claveBorrador);
+      if (guardado !== null) {
+        const datos: unknown = JSON.parse(guardado);
+        if (!esBorradorSesion(datos)) {
+          throw new Error('El borrador guardado tiene un formato no válido.');
+        }
+        formulario = { ...formulario, ...datos };
+      }
+    } catch (error) {
+      errorBorrador = error instanceof Error
+        ? `No se pudo restaurar el borrador de esta pestaña: ${error.message}`
+        : 'No se pudo restaurar el borrador de esta pestaña.';
+    } finally {
+      borradorListo = true;
+    }
+  });
+
+  $effect(() => {
+    versionBorrador;
+    const borrador: BorradorSesion = {
+      estiloBase: formulario.estiloBase,
+      tipoDegradado: formulario.tipoDegradado,
+      longitudSuperior: formulario.longitudSuperior,
+      textura: formulario.textura,
+      diseñoLateral: formulario.diseñoLateral,
+      terminacionNuca: formulario.terminacionNuca,
+      estiloBarba: formulario.estiloBarba,
+    };
+    if (!borradorListo) return;
+    if (omitirPersistenciaBorrador) {
+      omitirPersistenciaBorrador = false;
+      return;
+    }
+
+    try {
+      sessionStorage.setItem(claveBorrador, JSON.stringify(borrador));
+      errorBorrador = '';
+    } catch (error) {
+      errorBorrador = error instanceof Error
+        ? `No se pudo guardar el borrador de esta pestaña: ${error.message}`
+        : 'No se pudo guardar el borrador de esta pestaña.';
+    }
+  });
 
   $effect(() => {
     const diseño = diseñoSeleccionado;
@@ -145,10 +248,12 @@
     intentoGuardar = false;
     intentoFinalizar = false;
     if (finalizar) {
+      limpiarBorradorSesion();
       formulario = diseñoVacio();
       idEdicion = null;
       mensaje = 'Diseño finalizado correctamente. Ya está preparado para enviarse.';
     } else {
+      limpiarBorradorSesion();
       formulario = {
         cliente: resultado.diseño.cliente,
         nombreDiseño: resultado.diseño.nombreDiseño,
@@ -188,6 +293,7 @@
       esError = false;
       intentoGuardar = false;
       intentoGuardarSupabase = false;
+      limpiarBorradorSesion();
       mensaje = 'Diseño guardado en Supabase correctamente.';
     } catch (error) {
       mensaje = error instanceof Error
@@ -398,6 +504,9 @@
       ></textarea>
     </div>
 
+    {#if errorBorrador}
+      <p class="mensaje-error" role="alert">{errorBorrador}</p>
+    {/if}
     {#if mensaje}
       <p class={esError ? 'mensaje-error' : ''} role={esError ? 'alert' : 'status'}>{mensaje}</p>
     {/if}
