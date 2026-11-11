@@ -35,3 +35,12 @@
 3. Actualizar atómicamente por `id_diseno` y por el `estado_diseno` que la interfaz leyó. Se eligió porque usa la fila cargada como precondición en una sola petición; si ya cambió, no se modifica ninguna fila y la interfaz ofrece recargar.
 
 **Prueba con RLS:** Las políticas actuales no permiten que dos propietarios distintos escriban el mismo diseño. Para reproducir la copia vieja sin ampliar RLS, abrir dos sesiones autorizadas del mismo propietario (por ejemplo, el mismo usuario en dos navegadores): cargar el diseño en ambas, cambiar su estado desde la sesión B y luego intentar cambiarlo desde la copia sin recargar de A.
+
+## Semana 10 · dónde vive cada cosa
+
+| Dato | Clase | Dónde vive | Por qué ahí | Qué arriesga |
+|---|---|---|---|---|
+| Diseño remoto | Persistente y compartido | Supabase, tabla `public.disenos_corte` | RLS aplica la propiedad en el servidor; es la fuente de verdad entre sesiones. | Cambios no autorizados si permisos o políticas se amplían incorrectamente; errores de red pueden impedir confirmar una operación. |
+| Sesión/token | Credencial de autenticación | Persistencia administrada por Supabase JS en el navegador; validación del usuario en Supabase Auth | SDK mantiene renovación y ciclo de sesión; la aplicación no crea almacenamiento paralelo. | `localStorage` es accesible desde JavaScript y puede quedar expuesto ante XSS. No guardar tokens manualmente ni imprimirlos. |
+| Filtro | Preferencia de interfaz | `localStorage` del navegador | Debe sobrevivir recargas y no es dato de negocio ni fuente de autorización. | Puede ser manipulado o no estar disponible; validar valores desconocidos y usar `Todos` como alternativa. |
+| Borrador | Preferencia temporal del formulario | `sessionStorage` de la pestaña | Se restaura en la misma pestaña y se separa de diseños remotos y del almacenamiento persistente local. Solo guarda opciones cerradas de corte. | Se pierde al cerrar la pestaña y sigue siendo accesible a JavaScript; no persistir credenciales, nombre del cliente ni texto libre. |
