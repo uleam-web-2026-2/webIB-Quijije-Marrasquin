@@ -10,6 +10,8 @@ export type EstadoEnvio =
   | 'Aceptado'
   | 'Rechazado';
 
+export type EstadoTicket = string;
+
 export type Json =
   | string
   | number
@@ -17,6 +19,12 @@ export type Json =
   | null
   | Json[]
   | { [key: string]: Json };
+
+export interface Ticket {
+  id: number;
+  estado: EstadoTicket;
+  creado_en: string;
+}
 
 export interface Cliente {
   id_cliente: string;
