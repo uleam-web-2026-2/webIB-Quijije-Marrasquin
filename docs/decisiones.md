@@ -44,3 +44,7 @@
 | Sesión/token | Credencial de autenticación | Persistencia administrada por Supabase JS en el navegador; validación del usuario en Supabase Auth | SDK mantiene renovación y ciclo de sesión; la aplicación no crea almacenamiento paralelo. | `localStorage` es accesible desde JavaScript y puede quedar expuesto ante XSS. No guardar tokens manualmente ni imprimirlos. |
 | Filtro | Preferencia de interfaz | `localStorage` del navegador | Debe sobrevivir recargas y no es dato de negocio ni fuente de autorización. | Puede ser manipulado o no estar disponible; validar valores desconocidos y usar `Todos` como alternativa. |
 | Borrador | Preferencia temporal del formulario | `sessionStorage` de la pestaña | Se restaura en la misma pestaña y se separa de diseños remotos y del almacenamiento persistente local. Solo guarda opciones cerradas de corte. | Se pierde al cerrar la pestaña y sigue siendo accesible a JavaScript; no persistir credenciales, nombre del cliente ni texto libre. |
+
+## Declaración de uso de IA — documentación de evidencias
+
+Se utilizó asistencia de inteligencia artificial para organizar y revisar la documentación de las pruebas. Las pruebas y capturas descritas fueron realizadas y verificadas manualmente.
