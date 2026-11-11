@@ -6,8 +6,8 @@ Los resultados de red deben completarse únicamente después de ejecutar cada ca
 
 | Caso | Petición | Código | Cuerpo de la respuesta | Qué mostró la pantalla |
 |---|---|---|---|---|
-| CASO 1: PATCH autenticado con política UPDATE activa | `PATCH` a `public.disenos_corte`, filtrado por `id_diseno` y estado leído, con cuerpo `{"estado_diseno":"<nuevo estado>"}`. | PENDIENTE DE PRUEBA MANUAL | PENDIENTE DE PRUEBA MANUAL | PENDIENTE DE PRUEBA MANUAL |
-| CASO 2: PATCH sin sesión | Repetir el `PATCH` de prueba sin encabezado `Authorization` ni cookies de sesión; conservar solo la configuración pública necesaria del cliente REST. | PENDIENTE DE PRUEBA MANUAL | PENDIENTE DE PRUEBA MANUAL | PENDIENTE DE PRUEBA MANUAL |
+| CASO 1: PATCH autenticado con política UPDATE activa | `PATCH` a `public.disenos_corte`, filtrado por `id_diseno` y estado esperado; se solicitó la fila modificada. | `200 OK` | La respuesta incluyó el `id_diseno` solicitado y `estado_diseno: "Personalizado"`. | La fila mostró `Personalizado`; la respuesta de red confirmó el estado. Captura: `capturas/caso1.png`. |
+| CASO 2: PATCH sin sesión | `PATCH` sin sesión de usuario ni encabezado `Authorization`, usando solo la clave pública como `apikey`; estado solicitado `Borrador`. | `401 Unauthorized` | `{"code":"42501","details":null,"hint":"Grant the required privileges to the current role with: GRANT UPDATE ON public.disenos_corte TO anon;","message":"permission denied for table disenos_corte"}` | El servidor rechazó la petición por permisos. La petición manual no probó la reacción visual de la aplicación; no hay captura del caso. |
 | CASO 3: PATCH autenticado con política UPDATE temporalmente retirada | En un proyecto aislado de prueba, retirar temporalmente solo la política UPDATE y enviar el mismo `PATCH` autenticado. RLS debe permanecer habilitado. | PENDIENTE DE PRUEBA MANUAL | PENDIENTE DE PRUEBA MANUAL | PENDIENTE DE PRUEBA MANUAL |
 | CASO 4: GET con token inválido tras recargar | Invalidar/revocar la sesión de prueba desde Supabase Auth, recargar la aplicación y observar la validación `GET` del usuario. No inspeccionar ni copiar el token. | PENDIENTE DE PRUEBA MANUAL | PENDIENTE DE PRUEBA MANUAL | PENDIENTE DE PRUEBA MANUAL |
 | CASO 5: PATCH desde una copia vieja | Dos sesiones del mismo propietario cargan el mismo estado. B cambia el estado; A, sin recargar, intenta guardar otro estado con la copia anterior. | PENDIENTE DE PRUEBA MANUAL | PENDIENTE DE PRUEBA MANUAL | PENDIENTE DE PRUEBA MANUAL |
@@ -62,4 +62,4 @@ Guardar solo capturas reales en `docs/taller10/capturas/` con estos nombres:
 - `caso4.png`
 - `caso5.png`
 
-Al momento de preparar este documento no se han realizado ni añadido capturas; todos los casos permanecen pendientes de prueba manual.
+La captura real `caso1.png` está añadida. No se han realizado ni añadido capturas para los casos 2–5; esos casos permanecen pendientes de prueba manual.
