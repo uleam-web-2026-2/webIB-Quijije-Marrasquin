@@ -288,6 +288,66 @@
     }
   }
 
+  function esSesionRechazada(error: unknown): boolean {
+    if (typeof error !== 'object' || error === null) return false;
+    const detalle = error as { status?: unknown; message?: unknown };
+    const mensaje = typeof detalle.message === 'string'
+      ? detalle.message.toLowerCase()
+      : '';
+    return detalle.status === 401 ||
+      detalle.status === 403 ||
+      mensaje.includes('invalid jwt') ||
+      mensaje.includes('jwt expired') ||
+      mensaje.includes('token is expired') ||
+      mensaje.includes('refresh token not found') ||
+      mensaje.includes('invalid refresh token');
+  }
+
+  async function limpiarSesionRechazada(): Promise<void> {
+    const { error } = await supabase.auth.signOut({ scope: 'local' });
+    actualizarSesion(null);
+    errorAutenticacion = true;
+    mensajeAutenticacion = error
+      ? 'El servidor rechazó la sesión y no se pudo limpiar su almacenamiento local. Inicia sesión nuevamente.'
+      : 'La sesión guardada expiró o fue rechazada. Inicia sesión nuevamente.';
+  }
+
+  async function restaurarSesion(): Promise<void> {
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) throw error;
+      if (!data.session) {
+        actualizarSesion(null);
+        return;
+      }
+
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) {
+        if (esSesionRechazada(userError)) {
+          await limpiarSesionRechazada();
+          return;
+        }
+        actualizarSesion(null);
+        throw userError;
+      }
+
+      if (!userData.user || userData.user.id !== data.session.user.id) {
+        await limpiarSesionRechazada();
+        return;
+      }
+
+      actualizarSesion(data.session);
+    } catch (error) {
+      actualizarSesion(null);
+      errorAutenticacion = true;
+      mensajeAutenticacion = error instanceof Error
+        ? `No se pudo validar la sesión con el servidor: ${error.message}`
+        : 'No se pudo validar la sesión con el servidor. Inicia sesión nuevamente.';
+    } finally {
+      cargandoSesion = false;
+    }
+  }
+
   function explicarErrorAutenticacion(error: Error): string {
     const mensaje = error.message.toLowerCase();
     if (mensaje.includes('invalid login credentials')) {
@@ -347,27 +407,14 @@
 
   onMount(() => {
     void cargarEstilosSupabase();
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       queueMicrotask(() => {
+        if (event === 'INITIAL_SESSION') return;
         actualizarSesion(session);
-        cargandoSesion = false;
       });
     });
 
-    void supabase.auth.getSession()
-      .then(({ data, error }) => {
-        if (error) throw error;
-        actualizarSesion(data.session);
-      })
-      .catch((error: unknown) => {
-        errorAutenticacion = true;
-        mensajeAutenticacion = error instanceof Error
-          ? explicarErrorAutenticacion(error)
-          : 'No se pudo recuperar la sesión.';
-      })
-      .finally(() => {
-        cargandoSesion = false;
-      });
+    void restaurarSesion();
 
     try {
       diseños = cargarDiseños();

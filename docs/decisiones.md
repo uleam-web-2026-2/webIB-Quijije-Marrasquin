@@ -15,3 +15,11 @@
 **Consecuencia concreta:** El barbero obtiene en una sola vista los datos necesarios para identificar la atención y conocer su estado, respetando el máximo de cinco columnas.
 
 **Qué se pierde:** Quedan fuera otros datos posibles como teléfono, precio, notas o el detalle completo del diseño personalizado. Esos datos podrán consultarse en una pantalla posterior.
+
+## Semana 10 · Sesión y almacenamiento seguro
+
+**Decisión:** La persistencia, renovación y cierre de sesión se delegan a Supabase JS. Al restaurar una sesión, la aplicación valida al usuario con el servidor; si la sesión es rechazada o no coincide, limpia el estado autenticado de la interfaz y elimina la sesión local mediante la API de Supabase.
+
+**Riesgo:** La persistencia de sesión del cliente puede utilizar `localStorage`, que es accesible a JavaScript y puede quedar expuesto ante una vulnerabilidad XSS.
+
+**Mitigación:** No se guardan tokens ni contraseñas en almacenamiento propio ni se escriben en consola. La interfaz debe evitar inyecciones, conservar el escape de texto de Svelte y no renderizar contenido no confiable como HTML.
