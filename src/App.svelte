@@ -11,6 +11,7 @@
     obtenerDisenoConEstiloPorId,
     obtenerIdClientePorUsuario,
     actualizarEstadoDisenoCorte,
+    EstadoDisenoConcurrentementeModificadoError,
     type DisenoConEstilo,
   } from './lib/consultasSupabase';
   import { cargarEnvios, guardarEnvios, type EnvioDiseño } from './lib/envios';
@@ -39,6 +40,7 @@
   let actualizandoEstadoDisenoId = $state<string | null>(null);
   let mensajeActualizacionEstado = $state('');
   let errorActualizacionEstado = $state(false);
+  let requiereRecargaDisenos = $state(false);
   let filtroDisenosSupabase = $state<FiltroEstadoDiseno>('Todos');
   let errorFiltroDisenosSupabase = $state('');
   let disenosSupabaseFiltrados = $derived(
@@ -277,7 +279,11 @@
     errorActualizacionEstado = false;
 
     try {
-      const resultado = await actualizarEstadoDisenoCorte(diseno.id_diseno, nuevoEstado);
+      const resultado = await actualizarEstadoDisenoCorte(
+        diseno.id_diseno,
+        diseno.estado_diseno,
+        nuevoEstado,
+      );
       disenosSupabase = disenosSupabase.map((item) =>
         item.id_diseno === resultado.id_diseno
           ? { ...item, estado_diseno: resultado.estado_diseno }
@@ -288,14 +294,24 @@
       }
       estadoObjetivoDiseno[resultado.id_diseno] = resultado.estado_diseno;
       mensajeActualizacionEstado = `Estado actualizado a ${resultado.estado_diseno}.`;
+      requiereRecargaDisenos = false;
     } catch (error) {
       mensajeActualizacionEstado = error instanceof Error
         ? `No se pudo confirmar la actualización: ${error.message}`
         : 'No se pudo confirmar la actualización del diseño. Inténtalo nuevamente.';
       errorActualizacionEstado = true;
+      requiereRecargaDisenos = error instanceof EstadoDisenoConcurrentementeModificadoError;
     } finally {
       actualizandoEstadoDisenoId = null;
     }
+  }
+
+  async function recargarDisenosTrasConflicto(): Promise<void> {
+    if (!userIdActivo || cargandoDisenosSupabase) return;
+    requiereRecargaDisenos = false;
+    mensajeActualizacionEstado = '';
+    errorActualizacionEstado = false;
+    await cargarDisenosSupabase(userIdActivo);
   }
 
   function actualizarSesion(session: Session | null): void {
@@ -756,6 +772,16 @@
             <p class={errorActualizacionEstado ? 'mensaje-error' : ''} role={errorActualizacionEstado ? 'alert' : 'status'}>
               {mensajeActualizacionEstado}
             </p>
+          {/if}
+          {#if requiereRecargaDisenos}
+            <button
+              class="accion-seleccion"
+              type="button"
+              disabled={cargandoDisenosSupabase || actualizandoEstadoDisenoId !== null}
+              onclick={recargarDisenosTrasConflicto}
+            >
+              Recargar diseños
+            </button>
           {/if}
           <div class="tabla-scroll">
             <table>

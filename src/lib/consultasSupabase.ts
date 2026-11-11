@@ -5,6 +5,13 @@ export interface DisenoConEstilo extends DisenoCorte {
   estilos_base: Pick<EstiloBase, 'id_estilo' | 'nombre' | 'descripcion'> | null;
 }
 
+export class EstadoDisenoConcurrentementeModificadoError extends Error {
+  constructor() {
+    super('El diseño pudo cambiar desde que se cargó. Recarga los datos antes de volver a intentarlo.');
+    this.name = 'EstadoDisenoConcurrentementeModificadoError';
+  }
+}
+
 export type NuevoDisenoCorte = Pick<
   DisenoCorte,
   | 'id_cliente'
@@ -68,6 +75,7 @@ export async function crearDisenoCorte(
 
 export async function actualizarEstadoDisenoCorte(
   idDiseno: string,
+  estadoEsperado: EstadoDiseno,
   nuevoEstado: EstadoDiseno,
 ): Promise<Pick<DisenoCorte, 'id_diseno' | 'estado_diseno'>> {
   if (!idDiseno.trim()) {
@@ -78,6 +86,7 @@ export async function actualizarEstadoDisenoCorte(
     .from('disenos_corte')
     .update({ estado_diseno: nuevoEstado })
     .eq('id_diseno', idDiseno)
+    .eq('estado_diseno', estadoEsperado)
     .select('id_diseno, estado_diseno')
     .returns<Pick<DisenoCorte, 'id_diseno' | 'estado_diseno'>[]>()
     .maybeSingle();
@@ -87,7 +96,7 @@ export async function actualizarEstadoDisenoCorte(
   }
 
   if (!data) {
-    throw new Error('Supabase no confirmó la actualización de ningún diseño.');
+    throw new EstadoDisenoConcurrentementeModificadoError();
   }
 
   if (data.id_diseno !== idDiseno || data.estado_diseno !== nuevoEstado) {

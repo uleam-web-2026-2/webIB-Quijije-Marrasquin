@@ -23,3 +23,15 @@
 **Riesgo:** La persistencia de sesión del cliente puede utilizar `localStorage`, que es accesible a JavaScript y puede quedar expuesto ante una vulnerabilidad XSS.
 
 **Mitigación:** No se guardan tokens ni contraseñas en almacenamiento propio ni se escriben en consola. La interfaz debe evitar inyecciones, conservar el escape de texto de Svelte y no renderizar contenido no confiable como HTML.
+
+## Semana 10 · concurrencia
+
+### La copia vieja
+
+**Alternativas consideradas:**
+
+1. Actualizar siempre por `id_diseno` y recargar la lista después. Se descartó porque una lectura posterior no evita que el UPDATE incondicional sobrescriba silenciosamente el estado más nuevo.
+2. Agregar una columna de versión o comparar `actualizado_en`. Se descartó para esta fase porque requiere una migración de esquema y una estrategia de versión/precisión temporal adicional.
+3. Actualizar atómicamente por `id_diseno` y por el `estado_diseno` que la interfaz leyó. Se eligió porque usa la fila cargada como precondición en una sola petición; si ya cambió, no se modifica ninguna fila y la interfaz ofrece recargar.
+
+**Prueba con RLS:** Las políticas actuales no permiten que dos propietarios distintos escriban el mismo diseño. Para reproducir la copia vieja sin ampliar RLS, abrir dos sesiones autorizadas del mismo propietario (por ejemplo, el mismo usuario en dos navegadores): cargar el diseño en ambas, cambiar su estado desde la sesión B y luego intentar cambiarlo desde la copia sin recargar de A.
