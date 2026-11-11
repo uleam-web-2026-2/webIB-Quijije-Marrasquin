@@ -25,6 +25,9 @@
   import type { DisenoCorte as DisenoCorteSupabase, EstadoDiseno, EstiloBase } from './tipos';
   import { supabase } from './lib/supabase';
 
+  type FiltroEstadoDiseno = 'Todos' | EstadoDiseno;
+  const claveFiltroDisenosSupabase = 'corte-ideal-filtro-disenos-supabase-v1';
+
   let diseños = $state<DiseñoCorte[]>([]);
   let estilosBaseDisponibles = $state<EstiloBase[]>([]);
   let cargandoEstilos = $state(true);
@@ -36,6 +39,13 @@
   let actualizandoEstadoDisenoId = $state<string | null>(null);
   let mensajeActualizacionEstado = $state('');
   let errorActualizacionEstado = $state(false);
+  let filtroDisenosSupabase = $state<FiltroEstadoDiseno>('Todos');
+  let errorFiltroDisenosSupabase = $state('');
+  let disenosSupabaseFiltrados = $derived(
+    filtroDisenosSupabase === 'Todos'
+      ? disenosSupabase
+      : disenosSupabase.filter((diseno) => diseno.estado_diseno === filtroDisenosSupabase),
+  );
   let detalleDiseno = $state<DisenoConEstilo | null>(null);
   let cargandoDetalle = $state(false);
   let errorDetalle = $state('');
@@ -213,6 +223,28 @@
       valor === 'Finalizado'
     ) {
       estadoObjetivoDiseno[idDiseno] = valor;
+    }
+  }
+
+  function cambiarFiltroDisenosSupabase(valor: string): void {
+    if (
+      valor !== 'Todos' &&
+      valor !== 'Borrador' &&
+      valor !== 'Personalizado' &&
+      valor !== 'Finalizado'
+    ) {
+      filtroDisenosSupabase = 'Todos';
+    } else {
+      filtroDisenosSupabase = valor;
+    }
+
+    try {
+      localStorage.setItem(claveFiltroDisenosSupabase, filtroDisenosSupabase);
+      errorFiltroDisenosSupabase = '';
+    } catch (error) {
+      errorFiltroDisenosSupabase = error instanceof Error
+        ? `No se pudo guardar el filtro en este navegador: ${error.message}`
+        : 'No se pudo guardar el filtro en este navegador.';
     }
   }
 
@@ -422,6 +454,20 @@
       errorAlmacenamiento = error instanceof Error
         ? `No se pudieron cargar los diseños guardados: ${error.message}`
         : 'No se pudieron cargar los diseños guardados.';
+    }
+
+    try {
+      const filtroGuardado = localStorage.getItem(claveFiltroDisenosSupabase);
+      filtroDisenosSupabase =
+        filtroGuardado === 'Borrador' ||
+        filtroGuardado === 'Personalizado' ||
+        filtroGuardado === 'Finalizado'
+          ? filtroGuardado
+          : 'Todos';
+    } catch (error) {
+      errorFiltroDisenosSupabase = error instanceof Error
+        ? `No se pudo restaurar el filtro: ${error.message}`
+        : 'No se pudo restaurar el filtro.';
     }
 
     try {
@@ -680,12 +726,31 @@
           </div>
         </div>
 
+        <div class="campo-formulario">
+          <label for="filtro-disenos-supabase">Filtrar diseños por estado</label>
+          <select
+            id="filtro-disenos-supabase"
+            value={filtroDisenosSupabase}
+            onchange={(event) => cambiarFiltroDisenosSupabase(event.currentTarget.value)}
+          >
+            <option value="Todos">Todos</option>
+            <option value="Borrador">Borrador</option>
+            <option value="Personalizado">Personalizado</option>
+            <option value="Finalizado">Finalizado</option>
+          </select>
+        </div>
+        {#if errorFiltroDisenosSupabase}
+          <p class="mensaje-error" role="alert">{errorFiltroDisenosSupabase}</p>
+        {/if}
+
         {#if cargandoDisenosSupabase}
           <p role="status">Cargando diseños desde Supabase...</p>
         {:else if errorDisenosSupabase}
           <p class="mensaje-error" role="alert">{errorDisenosSupabase}</p>
         {:else if disenosSupabase.length === 0}
           <p role="status">No hay diseños autorizados disponibles para esta cuenta.</p>
+        {:else if disenosSupabaseFiltrados.length === 0}
+          <p role="status">Hay diseños remotos, pero ninguno coincide con el estado seleccionado.</p>
         {:else}
           {#if mensajeActualizacionEstado}
             <p class={errorActualizacionEstado ? 'mensaje-error' : ''} role={errorActualizacionEstado ? 'alert' : 'status'}>
@@ -704,7 +769,7 @@
                 </tr>
               </thead>
               <tbody>
-                {#each disenosSupabase as diseno (diseno.id_diseno)}
+                {#each disenosSupabaseFiltrados as diseno (diseno.id_diseno)}
                   <tr>
                     <td data-label="Diseño">{diseno.nombre_diseno}</td>
                     <td data-label="Estado">
